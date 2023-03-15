@@ -43,12 +43,12 @@ path libs_config_path = fs::exists(xdg_data_home)
 auto glb_config = toml::parse_file(glb_config_path.string());
 
 string hello_world_prgm = 
-    R"(#include <iostream>
+R"(#include <iostream>
 
-    int main(int argc, char* argv[]) {
+int main(int argc, char* argv[]) {
     std::cout<< "hello, world" << std::endl;
     return 0;
-    })";
+})";
 
 path root = fs::current_path();
 
@@ -64,7 +64,9 @@ void m_execvp(strvec cmd) {
     for (size_t i=0; i<cmd.size(); i++) {
         c_cmd[i] = (char*)malloc(cmd[i].size() * sizeof(char) + 1);
         strcpy(c_cmd[i], cmd[i].c_str());
+        std::cout << cmd[i] << " ";
     }
+    std::cout << std::endl;
     c_cmd[cmd.size()] = NULL;
 
     execvp(c_cmd[0], c_cmd);
@@ -146,8 +148,7 @@ strvec build_objects(string base_output_dir, strvec& cmd_args) {
         }
 
         string white_list[] = {".c", ".cpp", "c++", "cxx"};
-        if (std::find(std::begin(white_list), std::end(white_list),
-                      file.path().extension().string().c_str()) == std::end(white_list))
+        if (std::find(std::begin(white_list), std::end(white_list), file.path().extension()) == std::end(white_list))
             continue;
 
         string object_file = output_dir / file.path().parent_path() / file.path().stem().concat(".o");
@@ -186,11 +187,11 @@ void build(const int argc, char* argv[]) {
 
     if (argc >= 2 && string(argv[1]) == "release") {
         target_dir /= "release";
-        build_args = {cc, "-c", "-O3", "-std=c++20", "-o"};
+        build_args = {cc, "-I.", "-c", "-O3", "-std=c++20", "-o"};
     }
     else {
         target_dir /= "debug";
-        build_args = {cc, "-c", "-Og", "-g3", "-Wall", "-std=c++20", "-o"};
+        build_args = {cc, "-I.", "-c", "-Og", "-g3", "-Wall", "-std=c++20", "-o"};
     }
 
     fs::create_directory(target_dir);
