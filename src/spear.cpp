@@ -43,12 +43,12 @@ path libs_config_path = fs::exists(xdg_data_home)
 auto glb_config = toml::parse_file(glb_config_path.string());
 
 string hello_world_prgm = 
-R"(#include <iostream>
-
-int main(int argc, char* argv[]) {
-    std::cout<< "hello, world" << std::endl;
-    return 0;
-})";
+"#include <iostream>\n"
+"\n"
+"int main(int argc, char* argv[]) {\n"
+"    std::cout<< \"hello, world\" << std::endl;\n"
+"    return 0;\n"
+"};\n";
 
 path root = fs::current_path();
 
