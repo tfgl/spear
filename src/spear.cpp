@@ -25,22 +25,7 @@ using std::vector;
 using strvec = vector<string>;
 using path = fs::path;
 
-string cc = "g++";
-
-path xdg_config_home(getenv("XDG_CONFIG_HOME"));
-path xdg_data_home(getenv("XDG_DATA_HOME"));
-path home(getenv("HOME"));
-
-path glb_config_path = fs::exists(xdg_config_home)
-    ? xdg_config_home / "spear.toml"
-    : home / ".config"/"spear.toml";
-
-// TODO create dir & file when installing
-path libs_config_path = fs::exists(xdg_data_home)
-    ? xdg_data_home / "spear"/"libs.toml"
-    : home / ".local"/"share"/"spear"/"libs.toml";
-
-auto glb_config = toml::parse_file(glb_config_path.string());
+string cc = "clang++";
 
 string hello_world_prgm = 
 "#include <iostream>\n"
@@ -51,6 +36,37 @@ string hello_world_prgm =
 "};\n";
 
 path root = fs::current_path();
+
+toml::parse_result project_config() {
+    return toml::parse_file((root / "spear.toml").string());
+}
+
+toml::parse_result global_config() {
+    static path xdg_config_home(getenv("XDG_CONFIG_HOME"));
+    static path home(getenv("HOME"));
+
+    static path global_config_path = fs::exists(xdg_config_home)
+        ? xdg_config_home / "spear.toml"
+        : home / ".config"/"spear.toml";
+
+    static auto file = toml::parse_file(global_config_path.string());
+
+    return file;
+}
+
+toml::parse_result lib_configs() {
+    static path xdg_data_home(getenv("XDG_DATA_HOME"));
+    static path home(getenv("HOME"));
+
+    // TODO create dir & file when installing
+    static path libs_config_path = fs::exists(xdg_data_home)
+        ? xdg_data_home / "spear"/"libs.toml"
+        : home / ".local"/"share"/"spear"/"libs.toml";
+
+    static auto file = toml::parse_file(libs_config_path.string());
+
+    return file;
+}
 
 void find_root() {
     while ( !fs::exists(root / "spear.toml") && root.root_path() != root ) {
@@ -112,7 +128,7 @@ void new_project(const int argc, char* argv[]) {
     f_spear << "[project]\n"
         << "name = '" << argv[1] << "'\n"
         << "version = '0.1.0'\n"
-        << "authors = ["<< glb_config.at_path("user") <<"]\n"
+        << "authors = ["<< global_config().at_path("user") <<"]\n"
         << "\n"
         << "[dependencies]\n";
     f_spear.close();
@@ -143,7 +159,7 @@ strvec build_objects(string base_output_dir, strvec& cmd_args) {
     std::cout << "BUILDING" << std::endl;
     for (auto& file: fs::recursive_directory_iterator{"."}) {
         if(file.is_directory()) {
-            fs::create_directory(output_dir / file.path().stem());
+            fs::create_directory(output_dir / file.path());
             continue;
         }
 
@@ -178,7 +194,7 @@ strvec build_objects(string base_output_dir, strvec& cmd_args) {
 void build(const int argc, char* argv[]) {
     string project_name = toml::parse_file( (root / "spear.toml").string() )
         .at_path("project.name")
-        .value_or("");
+        .value_or("exec");
     path target_dir(root / "target");
     path target;
     strvec build_args;
@@ -191,19 +207,18 @@ void build(const int argc, char* argv[]) {
     }
     else {
         target_dir /= "debug";
-        build_args = {cc, "-I.", "-c", "-Og", "-g3", "-Wall", "-std=c++20", "-o"};
+        build_args = {cc, "-fdiagnostics-color=always", "-I.", "-c", "-Og", "-g3", "-Wall", "-std=c++20", "-o"};
     }
 
     fs::create_directory(target_dir);
-    target = target_dir / project_name;
+    fs::create_directory(target_dir / "object");
+    fs::create_directory(target_dir / "build");
+    target = target_dir / "build" / project_name;
 
-    auto args = build_objects(target_dir, build_args);
+    auto args = build_objects(target_dir / "object", build_args);
     args.push_back(root / target);
 
     std::cout << "LINKING" << std::endl;
-    for(auto& arg: args)
-    std::cout << arg << " ";
-    std::cout << std::endl;
 
     m_execvp(args);
 }
@@ -218,14 +233,14 @@ void run(const int argc, char* argv[]) {
         wait(NULL);
     }
 
-strvec command;
+    strvec command;
     string project_name = toml::parse_file( (root / "spear.toml").string() )
         .at_path("project.name")
         .value_or("");
 
     fs::path target = (argc >= 2 && string(argv[1]) == "release")
-        ? root / "target" / "release" / project_name
-        : root / "target" / "debug" / project_name;
+        ? root / "target" / "release" / "build" / project_name
+        : root / "target" / "debug" / "build" / project_name;
     command.push_back(target);
 
     int with_position = 0;
@@ -234,7 +249,7 @@ strvec command;
     if( argc >= 3 && string(argv[2]) == "with" ) // spear run release/debug with a b c d
         with_position = 3;
 
-if( with_position != 0 ) {
+    if( with_position != 0 ) {
         for(int i=with_position; i<argc; i++) {
             command.push_back(argv[i]);
         }
@@ -276,11 +291,11 @@ void add(const int argc, char* argv[]) {
         }
     }
 
-    auto libs_cfg = toml::parse_file(libs_config_path.string());
+    auto libs_cfg = lib_configs();
     auto lib_cfg = libs_cfg[lib_name];
     auto commands = lib_cfg["command"];
 
-    auto config = toml::parse_file("spear.toml");
+    auto config = project_config();
     string cfg_string =
         "version = '"+lib_version+"'\n"
         "command = [";
@@ -296,7 +311,7 @@ void add(const int argc, char* argv[]) {
     auto tbl = config["dependencies"].as_table();
     tbl->insert_or_assign(lib_name, cfg);
 
-    std::ofstream("spear.toml") << config;
+    std::ofstream(root / "spear.toml") << config;
     if(argc > 4)
         add(argc - 2, argv+2);
 }
@@ -330,10 +345,36 @@ void spear(const int argc, char* argv[]) {
     else if (argv1 == "add")
         add(argc - 1, argv+1);
 
+    else if (argv1 == "enable")
+        enable_feature(argc - 1, argv+1);
+
     else if (argv1 == "get_name")
         std::cout << toml::parse_file("spear.toml").at_path("project.name") << std::endl;
 
     else
         std::cout << man::spear << std::endl;
+
+}
+
+void enable_feature(const int argc, char **argv) {
+    CHECK( (argc < 3), man::enable_feature);
+
+    string lib = argv[1];
+    auto config = project_config();
+    if (!config["dependencies"].as_table()->contains(lib)) {
+        std::cout << "Error: the library '" << lib << "' is not added to this project" << std::endl
+                  << "You may want to run 'spear add " << lib << "' first" << std::endl;
+        return;
+    }
+
+    for (int i = 2; i < argc; i++) {
+        string feature = argv[i];
+
+        lib_configs()[lib][feature]["command"].as_array()->for_each([&config, &lib]
+            (toml::value<string> command) {
+                // TODO
+                config[lib]["command"].as_array()->push_back(string(command->data()));
+            });
+    }
 
 }
