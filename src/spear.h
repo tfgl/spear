@@ -1,6 +1,6 @@
 #pragma once
 
-#include "toml.h"
+#include "toml/toml.h"
 
 void new_project(const int argc, char* argv[]);
 void build(const int argc, char* argv[]);
