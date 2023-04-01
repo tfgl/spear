@@ -13,9 +13,11 @@ static std::string spear =
 "spear | new   <name>          | create a new project\n"
 "      | build [debug/release] | build the current project\n"
 "      | run   [debug/release] | run the current project\n"
-"      | clean                 | clean the project build\n"
+"      | add   <name>          | add a library to use in the project\n"
+"      | clean                 | clean the project targets\n"
 "      | package               | package the project into a library\n"
-"      | fetch                 | fetch the dependencies from spear.toml\n";
+"      | install               | install the release build in the path (default $XDG_DATA_HOME/spear/bin/)\n"
+"      | fetch <name> [url]    | download a library to use in any future project. (default libs location: $XDG_DATA_HOME/spear/libs/)\n";
 
 static std::string new_ =
 "spear new <name>"

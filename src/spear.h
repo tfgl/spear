@@ -9,4 +9,5 @@ void package(const int argc, char* argv[]);
 void fetch(const int argc, char* argv[]);
 void add(const int argc, char* argv[]);
 void enable_feature(const int argc, char* argv[]);
+void install(const int argc, char* argv[]);
 void spear(const int argc, char* argv[]);

@@ -2,5 +2,6 @@
 name = 'spear'
 version = '1.0.0'
 authors = []
+cc = 'g++'
 
 [dependencies]

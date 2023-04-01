@@ -3,6 +3,7 @@
  - [x] spear run [debug/release] (debug is default)
  - [x] spear build [debug/release] (debug is default)
  - [x] clean
+ - [x] install [debug/release] (debug is default)
  - [ ] package
  - [ ] fetch
  - [x] help
@@ -16,6 +17,7 @@
  - file:
   ```toml
   user = <name> #use to fill author field
+  cc = <compiler>
   ```
 
 # Project config
@@ -24,6 +26,7 @@
   [project]
   name = <name>
   version = <version>
+  cc = <compiler>
   authors = [<author>, ...]
  
   [dependencies.name]
@@ -37,7 +40,7 @@
   ```
   - TODO:
    - [ ] add a compiler section with:
-     - [ ] a variable to overwrite the default compiler
+     - [x] a variable to overwrite the default compiler
      - [ ] a variable to overwrite the default compiler command options (except the -o options)
 
 # Local storage
@@ -50,7 +53,7 @@
  ```toml
  [lib_name]
  url = <url> #the library repository
- command = [<arg>, ...] #the argument to add to compile with the library (ex: -lsdl2)
+ commands = [<arg>, ...] #the arguments to add to compile with the library (ex: -lsdl2)
  fetched = [<x.x.x>, ...] #all the fetched versions of the library
  versions = [<x.x.x> = <branch>, ...] #all the published versions of the library
  ```

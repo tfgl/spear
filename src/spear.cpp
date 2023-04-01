@@ -32,7 +32,7 @@ string hello_world_prgm =
 "    std::cout<< \"hello, world\" << std::endl;\n"
 "    return 0;\n"
 "};\n";
-string cc = "clang++";
+string cc = "g++";
 
 path root = fs::current_path();
 
@@ -149,8 +149,12 @@ void new_project(const int argc, char* argv[]) {
     f_spear << "[project]\n"
         << "name = '" << argv[1] << "'\n"
         << "version = '0.1.0'\n";
+    if (auto cc = global_config["cc"])
+        f_spear << "cc = " << cc.value() << "\n";
+    else
+        f_spear << "cc = 'g++'\n";
     if (auto author = global_config["user"])
-        f_spear << "authors = [" << *author << "]\n";
+        f_spear << "authors = [" << author.value() << "]\n";
     f_spear.close();
 
     // create git repo
@@ -317,50 +321,6 @@ void add(const int argc, char* argv[]) {
         add(argc - 2, argv+2);
 }
 
-void spear(const int argc, char* argv[]) {
-    CHECK((argc < 2), man::spear)
-    string argv1(argv[1]);
-    find_global_config();
-
-    if (argv1 == "new") {
-        new_project(argc - 1, argv + 1);
-        return;
-    }
-
-    find_root();
-    find_project_config();
-    find_lib_configs();
-    find_project_name();
-
-    if (argv1 == "run")
-        run(argc - 1, argv+1);
-
-    else if (argv1 == "build")
-        build(argc - 1, argv+1);
-
-    else if (argv1 == "clean")
-        clean();
-
-    else if (argv1 == "package")
-        package(argc - 1, argv+1);
-
-    else if (argv1 == "fetch")
-        fetch(argc - 1, argv+1);
-
-    else if (argv1 == "add")
-        add(argc - 1, argv+1);
-
-    else if (argv1 == "enable")
-        enable_feature(argc - 1, argv+1);
-
-    else if (argv1 == "get_name")
-        std::cout << project_name << std::endl;
-
-    else
-        std::cout << man::spear << std::endl;
-
-}
-
 void enable_feature(const int argc, char **argv) {
     CHECK( (argc < 3), man::enable_feature);
 
@@ -391,4 +351,74 @@ void enable_feature(const int argc, char **argv) {
     }
 
     std::ofstream(root / "spear.toml") << project_config;
+}
+
+void install(const int argc, char* argv[]) {
+    path xdg_data_home(getenv("XDG_DATA_HOME"));
+    path home(getenv("HOME"));
+    path bin_path = fs::exists(xdg_data_home)
+        ? xdg_data_home / "spear"
+        : home / ".local"/"share"/"spear";
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        build(argc, argv);
+        exit(0);
+    }
+    else {
+        wait(NULL);
+    }
+
+    fs::path target = (argc >= 2 && string(argv[1]) == "debug")
+        ? root / "target" / "debug" / "build" / project_name
+        : root / "target" / "release" / "build" / project_name;
+    m_execvp({"cp", target, bin_path});
+}
+
+void spear(const int argc, char* argv[]) {
+    CHECK((argc < 2), man::spear)
+    string argv1(argv[1]);
+    find_global_config();
+
+    if (argv1 == "new") {
+        new_project(argc - 1, argv + 1);
+        return;
+    }
+
+    find_root();
+    find_project_config();
+    find_lib_configs();
+    find_project_name();
+    cc = project_config["project.cc"].value()->as<toml::String>()->_data;
+
+    if (argv1 == "run")
+        run(argc - 1, argv+1);
+
+    else if (argv1 == "build")
+        build(argc - 1, argv+1);
+
+    else if (argv1 == "clean")
+        clean();
+
+    else if (argv1 == "package")
+        package(argc - 1, argv+1);
+
+    else if (argv1 == "fetch")
+        fetch(argc - 1, argv+1);
+
+    else if (argv1 == "add")
+        add(argc - 1, argv+1);
+
+    else if (argv1 == "enable")
+        enable_feature(argc - 1, argv+1);
+
+    else if (argv1 == "install")
+        install(argc - 1, argv+1);
+
+    else if (argv1 == "get_name")
+        std::cout << project_name << std::endl;
+
+    else
+        std::cout << man::spear << std::endl;
+
 }
