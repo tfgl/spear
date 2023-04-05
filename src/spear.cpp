@@ -172,6 +172,41 @@ void new_project(const int argc, char* argv[]) {
     }
 }
 
+bool newer_header(fs::path const& src_file, fs::file_time_type const time) {
+    std::ifstream infile(src_file);
+
+    strvec headers;
+    string line;
+    const string include_prefix = "#include \"";
+    const char include_suffix = '"';
+
+    while (getline(infile, line)) {
+        const size_t prefix_pos = line.find(include_prefix);
+
+        if (prefix_pos != string::npos) {
+            const size_t suffix_pos = line.find(include_suffix, prefix_pos + include_prefix.length());
+
+            if (suffix_pos != string::npos) {
+                const string include_path = line.substr(prefix_pos + include_prefix.length(), suffix_pos - prefix_pos - include_prefix.length());
+                headers.push_back(include_path);
+            }
+        }
+    }
+
+    const fs::path path = src_file.parent_path();
+    for (auto const& header: headers) {
+        auto header_path = path/header;
+
+        if (!fs::exists(header_path))
+            header_path = root/"src"/header;
+
+        if (fs::last_write_time(header_path) >= time) {
+            return true;
+        }
+    }
+    return false;
+}
+
 strvec build_objects(string base_output_dir, strvec& cmd_args) {
     fs::current_path(root / "src");
     path output_dir(root / base_output_dir);
@@ -180,27 +215,29 @@ strvec build_objects(string base_output_dir, strvec& cmd_args) {
     args.insert(args.end(), dependencies.begin(), dependencies.end());
 
     std::cout << "BUILDING" << std::endl;
-    for (auto& file: fs::recursive_directory_iterator{"."}) {
-        if(file.is_directory()) {
-            fs::create_directory(output_dir / file.path());
+    for (auto& src_file: fs::recursive_directory_iterator{"."}) {
+        if(src_file.is_directory()) {
+            fs::create_directory(output_dir / src_file.path());
             continue;
         }
 
         string white_list[] = {".c", ".cpp", "c++", "cxx"};
-        if (std::find(std::begin(white_list), std::end(white_list), file.path().extension()) == std::end(white_list))
+        if (std::find(std::begin(white_list), std::end(white_list), src_file.path().extension()) == std::end(white_list))
             continue;
 
-        string object_file = output_dir / file.path().parent_path() / file.path().stem().concat(".o");
+        string object_file = output_dir / src_file.path().parent_path() / src_file.path().stem().concat(".o");
         args.push_back(object_file);
 
         auto object_path = path{object_file};
-        if( fs::exists(object_path) && fs::last_write_time(object_path) > fs::last_write_time(file) )
+        auto const last_src_write = fs::last_write_time(src_file);
+        auto const last_obj_write = fs::last_write_time(object_path);
+        if( fs::exists(object_path) && last_obj_write > last_src_write && !newer_header(src_file, last_obj_write) )
             continue;
 
         pid_t pid = fork();
         if (pid == 0) {
             cmd_args.push_back(object_file);
-            cmd_args.push_back(file.path());
+            cmd_args.push_back(src_file.path());
 
             m_execvp(cmd_args);
             exit(0);
@@ -357,12 +394,16 @@ void install(const int argc, char* argv[]) {
     path xdg_data_home(getenv("XDG_DATA_HOME"));
     path home(getenv("HOME"));
     path bin_path = fs::exists(xdg_data_home)
-        ? xdg_data_home / "spear"
-        : home / ".local"/"share"/"spear";
+        ? xdg_data_home / "spear" / "bin"
+        : home / ".local"/"share"/"spear"/"bin";
 
     pid_t pid = fork();
     if (pid == 0) {
-        build(argc, argv);
+        if(argc < 2) {
+            char* args[] = {"install", "release"};
+            build(2, args);
+        }
+        else build(argc, argv);
         exit(0);
     }
     else {
