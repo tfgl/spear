@@ -149,8 +149,8 @@ void new_project(const int argc, char* argv[]) {
     f_spear << "[project]\n"
         << "name = '" << argv[1] << "'\n"
         << "version = '0.1.0'\n";
-    if (auto cc = global_config["cc"])
-        f_spear << "cc = " << cc.value() << "\n";
+    if (auto gcfg_cc = global_config["cc"])
+        f_spear << "cc = " << gcfg_cc.value() << "\n";
     else
         f_spear << "cc = 'g++'\n";
     if (auto author = global_config["user"])
@@ -230,9 +230,11 @@ strvec build_objects(string base_output_dir, strvec& cmd_args) {
 
         auto object_path = path{object_file};
         auto const last_src_write = fs::last_write_time(src_file);
-        auto const last_obj_write = fs::last_write_time(object_path);
-        if( fs::exists(object_path) && last_obj_write > last_src_write && !newer_header(src_file, last_obj_write) )
-            continue;
+        if( fs::exists(object_path) ) {
+            auto const last_obj_write = fs::last_write_time(object_path);
+            if (last_obj_write > last_src_write && !newer_header(src_file, last_obj_write) )
+                continue;
+        }
 
         pid_t pid = fork();
         if (pid == 0) {
@@ -430,7 +432,8 @@ void spear(const int argc, char* argv[]) {
     find_project_config();
     find_lib_configs();
     find_project_name();
-    cc = project_config["project.cc"].value()->as<toml::String>()->_data;
+    if (auto lcfg_cc = project_config["project.cc"])
+        cc = lcfg_cc.value()->as<toml::String>()->_data;
 
     if (argv1 == "run")
         run(argc - 1, argv+1);
